@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Nightfall Sprint — Double Jump</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-top:#160d2e;
+    --bg-bot:#2a1250;
+    --hero:#45e8ff;
+    --gold:#ffd166;
+    --danger-a:#ff5252;
+    --danger-b:#ffb142;
+    --ink:#eae6ff;
+    --muted:#9d8fd0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;overflow:hidden;background:#0c0720;}
+  body{
+    font-family:'Space Grotesk',system-ui,sans-serif;
+    color:var(--ink);
+    display:flex;align-items:center;justify-content:center;
+    -webkit-user-select:none;user-select:none;touch-action:none;
+  }
+  #wrap{position:relative;width:100%;height:100%;max-width:1100px;}
+  canvas{display:block;width:100%;height:100%;}
+
+  .overlay{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;
+    padding:24px;pointer-events:none;
+  }
+  .overlay.hidden{display:none;}
+
+  .card{
+    pointer-events:auto;
+    background:rgba(22,13,46,.72);
+    backdrop-filter:blur(8px);
+    border:1px solid rgba(69,232,255,.25);
+    border-radius:22px;
+    padding:34px 30px;
+    max-width:380px;width:100%;
+    box-shadow:0 24px 70px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
+  }
+  .eyebrow{
+    font-family:'Space Mono',monospace;
+    letter-spacing:.42em;text-transform:uppercase;
+    font-size:11px;color:var(--hero);margin-bottom:14px;padding-left:.42em;
+  }
+  h1{
+    font-size:clamp(34px,8vw,52px);line-height:.98;font-weight:700;
+    letter-spacing:-.02em;margin-bottom:6px;
+    background:linear-gradient(180deg,#fff, #c8b6ff);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .flame-word{
+    background:linear-gradient(180deg,var(--danger-b),var(--danger-a));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .sub{color:var(--muted);font-size:14.5px;line-height:1.5;margin:14px 0 24px;}
+  .keys{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:24px;}
+  .key{
+    font-family:'Space Mono',monospace;font-size:12px;color:var(--ink);
+    border:1px solid rgba(157,143,208,.4);border-radius:9px;
+    padding:7px 11px;background:rgba(255,255,255,.04);
+  }
+  .key b{color:var(--hero);}
+  button{
+    pointer-events:auto;cursor:pointer;font-family:'Space Grotesk',sans-serif;
+    font-weight:700;font-size:17px;color:#0c0720;letter-spacing:.01em;
+    border:none;border-radius:13px;padding:15px 34px;width:100%;
+    background:linear-gradient(180deg,var(--hero),#1fb6d6);
+    box-shadow:0 10px 30px rgba(69,232,255,.35), inset 0 1px 0 rgba(255,255,255,.5);
+    transition:transform .08s ease, box-shadow .2s ease;
+  }
+  button:hover{transform:translateY(-2px);box-shadow:0 16px 38px rgba(69,232,255,.5);}
+  button:active{transform:translateY(0);}
+  button:focus-visible{outline:3px solid #fff;outline-offset:3px;}
+
+  /* HUD */
+  #hud{
+    position:absolute;top:18px;left:0;right:0;
+    display:flex;justify-content:space-between;align-items:flex-start;
+    padding:0 22px;pointer-events:none;
+  }
+  .stat{font-family:'Space Mono',monospace;}
+  .stat .label{font-size:10px;letter-spacing:.28em;color:var(--muted);text-transform:uppercase;}
+  .stat .val{font-size:26px;color:#fff;line-height:1;margin-top:3px;
+    text-shadow:0 2px 14px rgba(69,232,255,.45);}
+  .stat.right{text-align:right;}
+  .stat.right .val{color:var(--gold);text-shadow:0 2px 14px rgba(255,209,102,.4);}
+
+  /* danger meter */
+  #safety{
+    position:absolute;left:22px;right:22px;bottom:16px;height:8px;
+    border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;
+    pointer-events:none;border:1px solid rgba(255,255,255,.06);
+  }
+  #safetyFill{height:100%;width:100%;border-radius:99px;
+    background:linear-gradient(90deg,var(--danger-a),var(--danger-b),var(--hero));
+    transition:width .12s linear;}
+  .hud-hidden{opacity:0;transition:opacity .3s;}
+
+  .final{display:flex;gap:26px;justify-content:center;margin:18px 0 22px;}
+  .final div .n{font-size:34px;font-weight:700;color:#fff;}
+  .final div.best .n{color:var(--gold);}
+  .final div small{display:block;font-size:10px;letter-spacing:.24em;
+    text-transform:uppercase;color:var(--muted);margin-top:2px;}
+  .tag{font-family:'Space Mono',monospace;font-size:13px;color:var(--hero);margin-bottom:6px;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hud-hidden">
+    <div class="stat"><div class="label">Distance</div><div class="val" id="score">0</div></div>
+    <div class="stat right"><div class="label">Orbs</div><div class="val" id="orbs">0</div></div>
+  </div>
+  <div id="safety" class="hud-hidden"><div id="safetyFill"></div></div>
+
+  <!-- Start screen -->
+  <div class="overlay" id="startScreen">
+    <div class="card">
+      <div class="eyebrow">Outrun the fire</div>
+      <h1>Nightfall<br><span class="flame-word">Sprint</span></h1>
+      <p class="sub">A wall of fire is chasing you through the canyon. Clear every hazard to push it back — clip one and it surges closer. Use your <b style="color:var(--hero)">double jump</b> to stay alive.</p>
+      <div class="keys">
+        <span class="key"><b>Space</b> / Click — Jump</span>
+        <span class="key">Tap again — <b>Double&nbsp;Jump</b></span>
+      </div>
+      <button id="startBtn">Start running</button>
+    </div>
+  </div>
+
+  <!-- Game over screen -->
+  <div class="overlay hidden" id="overScreen">
+    <div class="card">
+      <div class="tag" id="overTag">The fire caught you</div>
+      <h1>Burned&nbsp;out</h1>
+      <div class="final">
+        <div><div class="n" id="finalScore">0</div><small>Distance</small></div>
+        <div class="best"><div class="n" id="bestScore">0</div><small>Best</small></div>
+      </div>
+      <button id="retryBtn">Run again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const cv = document.getElementById('game');
+  const ctx = cv.getContext('2d');
+
+  // ---------- responsive canvas with DPI scaling ----------
+  let W = 0, H = 0, DPR = 1;
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    const r = cv.getBoundingClientRect();
+    W = r.width; H = r.height;
+    cv.width = Math.round(W * DPR);
+    cv.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+
+  // ---------- helpers ----------
+  const rand = (a,b)=> a + Math.random()*(b-a);
+  const clamp = (v,a,b)=> v<a?a:v>b?b:v;
+  const lerp = (a,b,t)=> a+(b-a)*t;
+
+  // ---------- game state ----------
+  const STATE = { MENU:0, PLAY:1, OVER:2 };
+  let state = STATE.MENU;
+  let best = 0; // in-memory high score (no storage in artifacts)
+
+  let groundY = 0;
+  const player = {
+    x:0, y:0, vy:0, r:20,
+    jumps:2, onGround:true,
+    squash:1, runPhase:0, trail:[], inv:0,
+  };
+
+  let scrollSpeed = 0;       // px/sec the world moves
+  let baseSpeed = 360;
+  let distance = 0;          // score
+  let orbCount = 0;
+  let gap = 0;               // safety pixels between player and fire wall
+  let maxGap = 0;
+  let shake = 0;
+  let elapsed = 0;
+  let spawnTimer = 0;
+  let orbTimer = 0;
+
+  let obstacles = [];
+  let orbs = [];
+  let particles = [];
+  let embers = [];
+  let hills = [];
+  let stars = [];
+
+  // ---------- setup layout-dependent values ----------
+  function layout(){
+    groundY = H - Math.max(70, H*0.16);
+    player.x = W * 0.26;
+    player.r = clamp(W*0.022, 16, 24);
+  }
+
+  function makeBackdrop(){
+    stars = [];
+    for(let i=0;i<70;i++){
+      stars.push({x:rand(0,W), y:rand(0,groundY*0.85), s:rand(.6,2), tw:rand(0,Math.PI*2), sp:rand(.5,2)});
+    }
+    hills = [];
+    // two parallax layers
+    for(let layer=0; layer<2; layer++){
+      const arr=[]; let x=-100;
+      const baseY = groundY - (layer===0? H*0.02 : H*0.10);
+      while(x < W+200){
+        const w = rand(160,320); const h = rand(40,120)*(layer===0?1:1.5);
+        arr.push({x, w, h, baseY});
+        x += w*rand(.7,1);
+      }
+      hills.push({off:0, speed:layer===0?0.18:0.35, shapes:arr, color:layer===0?'#241043':'#1c0d3a'});
+    }
+  }
+
+  // ---------- reset / start ----------
+  function reset(){
+    layout();
+    makeBackdrop();
+    scrollSpeed = baseSpeed;
+    distance = 0; orbCount = 0; elapsed = 0;
+    obstacles = []; orbs = []; particles = []; embers = [];
+    spawnTimer = 0.8; orbTimer = 1.6;
+    player.y = groundY - player.r;
+    player.vy = 0; player.jumps = 2; player.onGround = true;
+    player.squash = 1; player.trail = []; player.inv = 0;
+    maxGap = W * 0.55;
+    gap = maxGap;
+    shake = 0;
+  }
+
+  function startGame(){
+    reset();
+    state = STATE.PLAY;
+    document.getElementById('startScreen').classList.add('hidden');
+    document.getElementById('overScreen').classList.add('hidden');
+    document.getElementById('hud').classList.remove('hud-hidden');
+    document.getElementById('safety').classList.remove('hud-hidden');
+  }
+
+  function gameOver(){
+    state = STATE.OVER;
+    best = Math.max(best, Math.floor(distance));
+    document.getElementById('finalScore').textContent = Math.floor(distance);
+    document.getElementById('bestScore').textContent = best;
+    document.getElementById('overScreen').classList.remove('hidden');
+    document.getElementById('hud').classList.add('hud-hidden');
+    document.getElementById('safety').classList.add('hud-hidden');
+    // burst
+    for(let i=0;i<40;i++){
+      particles.push({x:player.x,y:player.y,vx:rand(-260,260),vy:rand(-380,80),
+        life:rand(.4,1),r:rand(2,5),c:i%2?'#ffb142':'#ff5252'});
+    }
+    shake = 18;
+  }
+
+  // ---------- input ----------
+  function jump(){
+    if(state !== STATE.PLAY) return;
+    if(player.jumps > 0){
+      const first = player.jumps === 2;
+      player.vy = first ? -560 : -500;
+      player.jumps--;
+      player.onGround = false;
+      player.squash = first ? 0.7 : 0.78;
+      // jump puff
+      const n = first?10:14;
+      for(let i=0;i<n;i++){
+        particles.push({x:player.x, y:player.y+player.r*0.6,
+          vx:rand(-90,90), vy:rand(-40,120), life:rand(.25,.55),
+          r:rand(2,4), c: first? 'rgba(157,143,208,0.9)':'#45e8ff'});
+      }
+    }
+  }
+
+  window.addEventListener('keydown', e=>{
+    if(e.code==='Space' || e.code==='ArrowUp'){
+      e.preventDefault();
+      if(state===STATE.MENU) startGame();
+      else if(state===STATE.OVER) startGame();
+      else jump();
+    }
+  });
+  cv.addEventListener('pointerdown', e=>{
+    e.preventDefault();
+    if(state===STATE.PLAY) jump();
+  });
+  document.getElementById('startBtn').addEventListener('click', startGame);
+  document.getElementById('retryBtn').addEventListener('click', startGame);
+
+  // ---------- spawning ----------
+  function spawnObstacle(){
+    // difficulty: occasionally double spikes
+    const big = Math.random() < clamp(elapsed/60,0,.4);
+    const count = (Math.random() < clamp(elapsed/40,0,.45)) ? 2 : 1;
+    const baseH = rand(34, 54) * (big?1.25:1);
+    for(let i=0;i<count;i++){
+      obstacles.push({
+        x: W + 40 + i*(baseH*0.9),
+        h: baseH, w: baseH*0.78,
+        cleared:false, hit:false, wob:rand(0,6.28)
+      });
+    }
+  }
+  function spawnOrb(){
+    const y = groundY - rand(70, 150);
+    orbs.push({x:W+30, y, r:9, got:false, bob:rand(0,6.28)});
+  }
+
+  // ---------- update ----------
+  function update(dt){
+    elapsed += dt;
+    // ramp speed
+    scrollSpeed = baseSpeed + Math.min(elapsed*9, 320);
+    const dx = scrollSpeed * dt;
+    distance += dx * 0.06;
+
+    // player physics
+    player.vy += 1700 * dt;            // gravity
+    player.y += player.vy * dt;
+    if(player.y >= groundY - player.r){
+      player.y = groundY - player.r;
+      if(!player.onGround){ // landing
+        for(let i=0;i<8;i++) particles.push({x:player.x,y:groundY,
+          vx:rand(-120,120),vy:rand(-30,-130),life:rand(.2,.4),r:rand(2,4),
+          c:'rgba(157,143,208,.8)'});
+      }
+      player.vy = 0; player.onGround = true; player.jumps = 2;
+    }
+    // squash recovery
+    player.squash = lerp(player.squash, 1, 1-Math.pow(0.001,dt));
+    if(player.onGround) player.runPhase += dt * (scrollSpeed/40);
+    if(player.inv>0) player.inv -= dt;
+
+    // trail
+    player.trail.unshift({x:player.x, y:player.y});
+    if(player.trail.length>10) player.trail.pop();
+
+    // safety gap shrinks slowly over time, faster as game speeds up
+    gap -= (26 + elapsed*1.4) * dt;
+
+    // spawn
+    spawnTimer -= dt;
+    const interval = clamp(1.25 - elapsed*0.01, 0.62, 1.25);
+    if(spawnTimer<=0){ spawnObstacle(); spawnTimer = interval * rand(.85,1.25); }
+    orbTimer -= dt;
+    if(orbTimer<=0){ spawnOrb(); orbTimer = rand(1.2,2.6); }
+
+    // obstacles
+    const pR = player.r;
+    for(const o of obstacles){
+      o.x -= dx;
+      // collision (player circle vs spike box, slightly forgiving)
+      if(!o.hit && !o.cleared){
+        const within = player.x + pR*0.6 > o.x - o.w/2 && player.x - pR*0.6 < o.x + o.w/2;
+        const low = player.y + pR*0.55 > groundY - o.h;
+        if(within && low && player.inv<=0){
+          o.hit = true;
+          gap -= 130;                 // fire surges forward
+          player.inv = 0.9;
+          shake = 14;
+          player.vy = Math.min(player.vy, -160);
+          for(let i=0;i<18;i++) particles.push({x:o.x,y:groundY-o.h,
+            vx:rand(-200,200),vy:rand(-260,40),life:rand(.3,.7),r:rand(2,5),
+            c:i%2?'#ff5252':'#ffb142'});
+        }
+      }
+      // cleared (passed safely behind player)
+      if(!o.cleared && !o.hit && o.x + o.w/2 < player.x - pR){
+        o.cleared = true;
+        gap = Math.min(maxGap, gap + 46);   // push fire back as reward
+        for(let i=0;i<6;i++) particles.push({x:player.x-pR,y:player.y,
+          vx:rand(-40,-160),vy:rand(-60,60),life:rand(.2,.5),r:rand(2,3),
+          c:'#45e8ff'});
+      }
+    }
+    obstacles = obstacles.filter(o=> o.x > -80);
+
+    // orbs
+    for(const orb of orbs){
+      orb.x -= dx; orb.bob += dt*4;
+      if(!orb.got){
+        const ddx = orb.x-player.x, ddy=(orb.y+Math.sin(orb.bob)*4)-player.y;
+        if(ddx*ddx+ddy*ddy < (orb.r+pR)*(orb.r+pR)){
+          orb.got = true; orbCount++;
+          distance += 10;
+          gap = Math.min(maxGap, gap + 18);
+          for(let i=0;i<14;i++) particles.push({x:orb.x,y:orb.y,
+            vx:rand(-160,160),vy:rand(-160,160),life:rand(.3,.6),r:rand(2,4),
+            c:'#ffd166'});
+        }
+      }
+    }
+    orbs = orbs.filter(o=> o.x>-40 && !o.got);
+
+    // particles
+    for(const p of particles){
+      p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 900*dt; p.life -= dt;
+    }
+    particles = particles.filter(p=> p.life>0);
+
+    // embers from fire
+    if(Math.random()<0.6){
+      const fx = player.x - gap;
+      embers.push({x:fx+rand(-10,40), y:rand(groundY*0.2,groundY), 
+        vx:rand(40,140), vy:rand(-30,-110), life:rand(.6,1.4), r:rand(1.5,3.5)});
+    }
+    for(const e of embers){ e.x+=e.vx*dt; e.y+=e.vy*dt; e.life-=dt; }
+    embers = embers.filter(e=> e.life>0 && e.x<W);
+
+    // parallax
+    for(const layer of hills){ layer.off -= dx*layer.speed; }
+
+    // shake decay
+    shake = lerp(shake, 0, 1-Math.pow(0.0001,dt));
+
+    // lose condition
+    if(gap <= 0){ gameOver(); }
+
+    // HUD
+    document.getElementById('score').textContent = Math.floor(distance);
+    document.getElementById('orbs').textContent = orbCount;
+    document.getElementById('safetyFill').style.width = clamp(gap/maxGap,0,1)*100 + '%';
+  }
+
+  // ---------- draw ----------
+  function drawBackground(t){
+    // sky
+    const g = ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#160d2e'); g.addColorStop(.55,'#23123f'); g.addColorStop(1,'#2a1250');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+    // moon glow
+    const mg = ctx.createRadialGradient(W*0.78,H*0.22,0,W*0.78,H*0.22,140);
+    mg.addColorStop(0,'rgba(120,90,200,.45)'); mg.addColorStop(1,'rgba(120,90,200,0)');
+    ctx.fillStyle=mg; ctx.beginPath(); ctx.arc(W*0.78,H*0.22,140,0,6.28); ctx.fill();
+    ctx.fillStyle='#d9d2ff'; ctx.beginPath(); ctx.arc(W*0.78,H*0.22,26,0,6.28); ctx.fill();
+    ctx.fillStyle='#160d2e'; ctx.beginPath(); ctx.arc(W*0.78+11,H*0.22-7,24,0,6.28); ctx.fill();
+
+    // stars
+    for(const s of stars){
+      const a = 0.4 + Math.abs(Math.sin(t*s.sp + s.tw))*0.6;
+      ctx.globalAlpha = a; ctx.fillStyle='#cfc6ff';
+      ctx.fillRect(s.x, s.y, s.s, s.s);
+    }
+    ctx.globalAlpha = 1;
+
+    // parallax hills
+    for(const layer of hills){
+      ctx.fillStyle = layer.color;
+      const period = layer.shapes.reduce((a,b)=>a+b.w,0) || W;
+      let off = ((layer.off % period)+period)%period;
+      for(let rep=-1; rep<=1; rep++){
+        let cx = -off + rep*period;
+        for(const sh of layer.shapes){
+          ctx.beginPath();
+          ctx.moveTo(cx, groundY);
+          ctx.lineTo(cx+sh.w*0.5, sh.baseY - sh.h);
+          ctx.lineTo(cx+sh.w, groundY);
+          ctx.closePath(); ctx.fill();
+          cx += sh.w;
+        }
+      }
+    }
+  }
+
+  function drawGround(){
+    ctx.fillStyle = '#2a1a4a';
+    ctx.fillRect(0, groundY, W, H-groundY);
+    // neon top edge
+    const ge = ctx.createLinearGradient(0,groundY,0,groundY+6);
+    ge.addColorStop(0,'rgba(69,232,255,.85)'); ge.addColorStop(1,'rgba(69,232,255,0)');
+    ctx.fillStyle = ge; ctx.fillRect(0,groundY,W,6);
+    ctx.strokeStyle='rgba(69,232,255,.9)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(0,groundY+1); ctx.lineTo(W,groundY+1); ctx.stroke();
+  }
+
+  function drawObstacle(o,t){
+    const top = groundY - o.h;
+    ctx.save();
+    ctx.translate(o.x,0);
+    // glow base
+    ctx.shadowColor = 'rgba(255,82,82,.7)'; ctx.shadowBlur = 16;
+    const grad = ctx.createLinearGradient(0, top, 0, groundY);
+    grad.addColorStop(0,'#ff8aa0'); grad.addColorStop(1,'#c0224a');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(-o.w/2, groundY);
+    ctx.lineTo(0, top);
+    ctx.lineTo(o.w/2, groundY);
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+    // inner edge highlight
+    ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(0,top); ctx.lineTo(o.w/2-3,groundY-3); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawOrb(orb){
+    const y = orb.y + Math.sin(orb.bob)*4;
+    ctx.save();
+    ctx.shadowColor='rgba(255,209,102,.9)'; ctx.shadowBlur=18;
+    const g = ctx.createRadialGradient(orb.x,y,0,orb.x,y,orb.r);
+    g.addColorStop(0,'#fff4cf'); g.addColorStop(.6,'#ffd166'); g.addColorStop(1,'#e8a838');
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.arc(orb.x,y,orb.r,0,6.28); ctx.fill();
+    ctx.restore();
+    // ring
+    ctx.strokeStyle='rgba(255,255,255,.5)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(orb.x,y,orb.r+3,0,6.28); ctx.stroke();
+  }
+
+  function drawPlayer(t){
+    // trail afterimages
+    for(let i=player.trail.length-1;i>=0;i--){
+      const tp=player.trail[i];
+      const a = (1 - i/player.trail.length)*0.22;
+      ctx.globalAlpha=a; ctx.fillStyle='#45e8ff';
+      ctx.beginPath(); ctx.arc(tp.x, tp.y, player.r*(0.9-i*0.03), 0, 6.28); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+
+    const flicker = player.inv>0 ? (Math.sin(t*40)*0.5+0.5) : 1;
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    const sq = player.squash, st = 1/Math.max(sq,0.5);
+    ctx.scale(st, sq); // squash & stretch (vertical squash, horizontal stretch)
+    const R = player.r;
+
+    // body glow
+    ctx.globalAlpha = flicker;
+    ctx.shadowColor='rgba(69,232,255,.9)'; ctx.shadowBlur=22;
+
+    // cape (flutters behind)
+    const flutter = Math.sin(t*12)*4;
+    ctx.fillStyle='#1fb6d6';
+    ctx.beginPath();
+    ctx.moveTo(-R*0.2,-R*0.4);
+    ctx.quadraticCurveTo(-R*1.6, -R*0.2+flutter, -R*1.3, R*0.9+flutter);
+    ctx.quadraticCurveTo(-R*0.7, R*0.4, -R*0.2, R*0.6);
+    ctx.closePath(); ctx.fill();
+
+    // legs (run cycle when grounded, tucked when airborne)
+    ctx.strokeStyle='#bff4ff'; ctx.lineWidth=R*0.26; ctx.lineCap='round';
+    let l1, l2;
+    if(player.onGround){
+      l1 = Math.sin(player.runPhase)*R*0.7;
+      l2 = Math.sin(player.runPhase+Math.PI)*R*0.7;
+    } else { l1 = -R*0.25; l2 = R*0.35; }
+    ctx.beginPath(); ctx.moveTo(-R*0.1,R*0.5); ctx.lineTo(-R*0.1+l1, R*1.05); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(R*0.1,R*0.5);  ctx.lineTo(R*0.1+l2,  R*1.05); ctx.stroke();
+
+    // body
+    const bg = ctx.createLinearGradient(0,-R,0,R);
+    bg.addColorStop(0,'#bff4ff'); bg.addColorStop(1,'#45e8ff');
+    ctx.fillStyle=bg;
+    ctx.beginPath();
+    ctx.ellipse(0, R*0.1, R*0.62, R*0.78, 0, 0, 6.28);
+    ctx.fill();
+    ctx.shadowBlur=0;
+
+    // head
+    ctx.fillStyle='#eafdff';
+    ctx.beginPath(); ctx.arc(R*0.08,-R*0.6, R*0.42, 0, 6.28); ctx.fill();
+    // visor
+    ctx.fillStyle='#0c2533';
+    ctx.beginPath(); ctx.ellipse(R*0.2,-R*0.58, R*0.22, R*0.16, 0, 0, 6.28); ctx.fill();
+    // arm swing
+    ctx.strokeStyle='#bff4ff'; ctx.lineWidth=R*0.2;
+    const arm = player.onGround? Math.sin(player.runPhase+Math.PI)*R*0.6 : R*0.5;
+    ctx.beginPath(); ctx.moveTo(R*0.1,-R*0.05); ctx.lineTo(R*0.1+arm, R*0.2); ctx.stroke();
+
+    ctx.restore();
+    ctx.globalAlpha=1;
+  }
+
+  function drawFireWall(t){
+    const fx = player.x - gap;     // right edge of the fire wall
+    if(fx < -60) return;
+    ctx.save();
+    // body of fire to the left of fx
+    const g = ctx.createLinearGradient(fx-220, 0, fx, 0);
+    g.addColorStop(0,'rgba(120,6,30,0)');
+    g.addColorStop(.45,'rgba(200,30,40,.65)');
+    g.addColorStop(.8,'rgba(255,82,82,.92)');
+    g.addColorStop(1,'rgba(255,177,66,.98)');
+    ctx.fillStyle=g;
+    ctx.fillRect(-10, 0, fx+10, H);
+
+    // flame tongues along the leading edge
+    ctx.shadowColor='rgba(255,140,40,.9)'; ctx.shadowBlur=30;
+    ctx.fillStyle='#ffb142';
+    const tongues = 14;
+    for(let i=0;i<=tongues;i++){
+      const y = (i/tongues)*H;
+      const reach = (Math.sin(t*6 + i*1.3)*0.5+0.5)*26 + 14
+                    + Math.sin(t*11+i)*8;
+      ctx.beginPath();
+      ctx.moveTo(fx, y - H/tongues/2);
+      ctx.quadraticCurveTo(fx+reach, y, fx, y + H/tongues/2);
+      ctx.closePath(); ctx.fill();
+    }
+    // hot core line
+    ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(255,240,200,.85)';
+    ctx.fillRect(fx-4,0,4,H);
+    ctx.restore();
+
+    // heat haze warning when close
+    if(gap < maxGap*0.32){
+      ctx.fillStyle = `rgba(255,80,40,${(1-gap/(maxGap*0.32))*0.18})`;
+      ctx.fillRect(0,0,W,H);
+    }
+  }
+
+  function drawParticles(){
+    for(const p of particles){
+      ctx.globalAlpha = clamp(p.life,0,1);
+      ctx.fillStyle = p.c;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,6.28); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+    for(const e of embers){
+      ctx.globalAlpha = clamp(e.life,0,1)*0.9;
+      ctx.fillStyle = Math.random()<.5?'#ffb142':'#ff7a3c';
+      ctx.beginPath(); ctx.arc(e.x,e.y,e.r,0,6.28); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // ---------- main loop ----------
+  let last = performance.now();
+  function frame(now){
+    let dt = (now-last)/1000; last = now;
+    dt = Math.min(dt, 0.033); // clamp big gaps
+    const t = now/1000;
+
+    if(state===STATE.PLAY) update(dt);
+
+    // screen shake transform
+    ctx.save();
+    if(shake>0.3){
+      const sx=rand(-shake,shake), sy=rand(-shake,shake);
+      ctx.translate(sx,sy);
+    }
+
+    drawBackground(t);
+    drawGround();
+    for(const o of obstacles) drawObstacle(o,t);
+    for(const orb of orbs) drawOrb(orb);
+    if(state!==STATE.MENU) drawPlayer(t);
+    if(state!==STATE.MENU) drawFireWall(t);
+    drawParticles();
+
+    ctx.restore();
+
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- boot ----------
+  resize();
+  layout();
+  makeBackdrop();
+  // idle player preview pose on menu? keep menu clean — start loop:
+  requestAnimationFrame(frame);
+
+  // relayout on resize while preserving state
+  window.addEventListener('resize', ()=>{ resize(); layout(); if(state===STATE.MENU) makeBackdrop(); });
+})();
+</script>
+</body>
+</html>
